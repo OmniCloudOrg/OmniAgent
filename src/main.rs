@@ -219,7 +219,7 @@ async fn get_container_logs(container_id: web::Path<String>) -> impl Responder {
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    println!("Starting OmniAgent server on http://127.0.0.1:8080");
+    println!("Starting OmniAgent server on http://0.0.0.0:8080");
 
     // Initialize metrics client in a separate task
     tokio::spawn(async move {
@@ -250,7 +250,7 @@ async fn main() -> std::io::Result<()> {
             .route("/containers/{id}", web::delete().to(remove_container))
             .route("/containers/{id}/logs", web::get().to(get_container_logs))
     })
-    .bind("127.0.0.1:8080")?
+    .bind("0.0.0.0:8080")?
     .run()
     .await
 }
