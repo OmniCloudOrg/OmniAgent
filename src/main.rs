@@ -5,7 +5,8 @@ use std::collections::HashMap;
 use chrono::prelude::*;
 
 mod metrics;
-use metrics::MetricsClient;
+mod api;
+mod cpi_actions;
 
 //-----------------------------------------------------------------------------
 // Data structures
@@ -13,19 +14,19 @@ use metrics::MetricsClient;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Container {
-    id: String,
-    name: String,
-    status: String,
-    image: String,
+    id:      String,
+    name:    String,
+    image:   String,
+    status:  String,
     created: String,
-    ports: Vec<String>,
+    ports:   Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
 struct ContainerConfig {
-    name: String,
-    image: String,
-    ports: Vec<String>,
+    name:        String,
+    image:       String,
+    ports:       Vec<String>,
     environment: Option<HashMap<String, String>>,
 }
 
@@ -55,12 +56,12 @@ async fn list_containers() -> impl Responder {
                 .map(|line| {
                     let parts: Vec<&str> = line.split('\t').collect();
                     Container {
-                        id: parts.get(0).unwrap_or(&"").to_string(),
-                        name: parts.get(1).unwrap_or(&"").to_string(),
-                        status: parts.get(2).unwrap_or(&"").to_string(),
-                        image: parts.get(3).unwrap_or(&"").to_string(),
+                        id:      parts.get(0).unwrap_or(&"").to_string(),
+                        name:    parts.get(1).unwrap_or(&"").to_string(),
+                        status:  parts.get(2).unwrap_or(&"").to_string(),
+                        image:   parts.get(3).unwrap_or(&"").to_string(),
                         created: parts.get(4).unwrap_or(&"").to_string(),
-                        ports: parts.get(5).unwrap_or(&"").split(',').map(String::from).collect(),
+                        ports:   parts.get(5).unwrap_or(&"").split(',').map(String::from).collect(),
                     }
                 })
                 .collect::<Vec<Container>>();
@@ -100,12 +101,12 @@ async fn create_container(config: web::Json<ContainerConfig>) -> impl Responder 
         Ok(output) => {
             if output.status.success() {
                 HttpResponse::Ok().json(Container {
-                    id: String::from_utf8_lossy(&output.stdout).trim().to_string(),
-                    name: config.name.clone(),
-                    status: "created".to_string(),
-                    image: config.image.clone(),
+                    id:      String::from_utf8_lossy(&output.stdout).trim().to_string(),
+                    name:    config.name.clone(),
+                    status:  "created".to_string(),
+                    image:   config.image.clone(),
                     created: chrono::Local::now().to_rfc3339(),
-                    ports: config.ports.clone(),
+                    ports:   config.ports.clone(),
                 })
             } else {
                 HttpResponse::BadRequest().json(ErrorResponse {
@@ -223,21 +224,7 @@ async fn main() -> std::io::Result<()> {
 
     // Initialize metrics client in a separate task
     tokio::spawn(async move {
-        loop {
-            match MetricsClient::connect("ws://metrics-server:8081/ws").await {
-                Ok(mut client) => {
-                    println!("Connected to metrics server");
-                    if let Err(e) = client.start_metrics_stream().await {
-                        eprintln!("Metrics client error: {:?}", e);
-                    }
-                }
-                Err(e) => {
-                    eprintln!("Failed to connect to metrics server: {:?}", e);
-                    // Wait before retrying
-                    tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
-                }
-            }
-        }
+        api::launch_rocket().await;
     });
 
     // Your existing HTTP server setup

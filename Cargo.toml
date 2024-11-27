@@ -13,4 +13,8 @@ socketioxide = "0.15.1"
 tokio = { version = "1.41.1", features = ["full"] }
 tokio-tungstenite = "0.24.0"
 futures-util = "0.3"
-url = "2.4"
+url = "2.5.4"
+ez_logging = "0.1.4"
+debug_print = "1.0.0"
+anyhow = "1.0.93"
+rocket = { version = "0.5.1", features = ["json"] }
