@@ -7,7 +7,6 @@ use serde_json::{Map, Value};
 use std::collections::HashMap;
 use std::fs;
 use std::process::{Command, Output};
-use crate::logging::Logger;
 use ez_logging::println;
 use debug_print::{
     debug_print as dprint,
@@ -22,7 +21,7 @@ pub struct CpiCommand {
 
 impl CpiCommand {
     pub fn new() -> Result<Self> {
-        let config_str = fs::read_to_string("./CPIs/cpi-vb-wsl.json")?;
+        let config_str = fs::read_to_string("./CPIs/cpi-container.json")?;
         let config_json: Value = serde_json::from_str(&config_str)?;
 
         Ok(Self {
@@ -33,7 +32,6 @@ impl CpiCommand {
     // Execute a CPI command by fetching the template from the CPI,
     // filling the params, and returning the output
     pub fn execute(&self, command: CpiCommandType) -> Result<Value> {
-        let logger = Logger::new(true);
         
         // Parse config
         let config_json: Value =
@@ -73,8 +71,8 @@ impl CpiCommand {
     
         // Serialize the enum variant to a JSON Value and extract params
         let params: Value = serde_json::to_value(&command).context("failed to serialize command")?;
-        logger.debug("Command parameters:");
-        logger.json("Params", &params);
+        println!("Command parameters:");
+        println!("Params {}", &params);
     
         let params = params
             .as_object()
@@ -84,7 +82,6 @@ impl CpiCommand {
     
         // Execute main command
         let mut command_str = replace_template_params(params, &mut command_template.to_string());
-        logger.info(format!("Executing command: {}", command_str.green().bold()));
     
         let output = execute_shell_cmd(&mut command_str)?;
         
@@ -92,7 +89,6 @@ impl CpiCommand {
         if !output.status.success() {
             let error_msg = String::from_utf8(output.stderr)
                 .context("failed to parse stderr as UTF-8")?;
-            logger.error(format!("Command failed: {}", error_msg));
             return Err(anyhow::anyhow!(error_msg));
         }
     
@@ -102,32 +98,20 @@ impl CpiCommand {
     
         // Execute post-exec commands if they exist
         if !post_exec_templates.is_empty() {
-            logger.info("Executing post-exec commands...");
             for (index, post_exec_template) in post_exec_templates.iter().enumerate() {
                 let mut post_exec_command = replace_template_params(params, &mut post_exec_template.to_string());
-                logger.debug(format!("Post-exec command {}/{}: {}", 
-                    index + 1, 
-                    post_exec_templates.len(),
-                    post_exec_command.green().bold()
-                ));
         
                 let post_exec_output = execute_shell_cmd(&mut post_exec_command)?;
         
                 if !post_exec_output.status.success() {
                     let error_msg = String::from_utf8(post_exec_output.stderr)
                         .context("failed to parse post-exec stderr as UTF-8")?;
-                    logger.error(format!("Post-exec command failed: {}", error_msg));
                     return Err(anyhow::anyhow!(error_msg));
                 }
-                
-                logger.success(format!("Post-exec command {}/{} completed successfully", 
-                    index + 1, 
-                    post_exec_templates.len()
-                ));
             }
-            logger.success("All commands completed successfully");
+            println!("Post-exec commands executed successfully");
         } else {
-            logger.success("Main command completed successfully");
+            println!("No post-exec commands found");
         }
 
         let json_output = serde_json::from_str("NULL")?;
@@ -193,139 +177,63 @@ impl<K: ToString, V: ToString> TemplateValue for HashMap<K, V> {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "snake_case")]
 pub enum CpiCommandType {
-    #[serde(rename = "create_vm")]
-    CreateVM {
-        guest_id: String,
-        memory_mb: i32,
-        os_type: String,
-        resource_pool: String,
-        datastore: String,
-        vm_name: String,
-        cpu_count: i32,
+    #[serde(rename = "create_container")]
+    CreateContainer {
+        image: String,
+        name: String,
+        ports: Vec<String>,
+        env: HashMap<String, String>,
     },
-    #[serde(rename = "delete_vm")]
-    DeleteVM {
-        vm_name: String,
+    #[serde(rename = "delete_container")]
+    DeleteContainer {
+        name: String,
     },
-    #[serde(rename = "has_vm")]
-    HasVM {
-        vm_name: String,
+    #[serde(rename = "start_container")]
+    StartContainer {
+        name: String,
     },
-    ConfigureNetworks {
-        vm_name: String,
-        network_index: i32,
-        network_type: String,
+    #[serde(rename = "stop_container")]
+    StopContainer {
+        name: String,
     },
-    CreateDisk {
-        size_mb: i32,
-        disk_path: String,
+    #[serde(rename = "restart_container")]
+    RestartContainer {
+        name: String,
     },
-    AttachDisk{
-        vm_name: String,
-        controller_name: String,
-        port: i32,
-        disk_path: String,
+    #[serde(rename = "inspect_container")]
+    InspectContainer {
+        name: String,
     },
-    DeleteDisk{
-        vm_name: String,
-        disk_path: String,
-    },
-    DetachDisk{
-        vm_name: String,
-        controller_name: String,
-        port: i32,
-    },
-    HasDisk{
-        vm_name: String,
-        disk_path: String,
-    },
-    #[serde(rename = "set_vm_metadata")]
-    SetVMMetadata{
-        vm_name: String,
-        key: String,
-        value: String,
-    },
-    CreateSnapshot{
-        vm_name: String,
-        snapshot_name: String,
-    },
-    DeleteSnapshot{
-        vm_name: String,
-        snapshot_name: String,
-    },
-    HasSnapshot{
-        vm_name: String,
-        snapshot_name: String,
-    },
-    GetDisks{
-        vm_name: String,
-    },
-    GetVM{
-        vm_name: String,
-    },
-    RebootVM{
-        vm_name: String,
-    },
-    SnapshotDisk{
-        disk_path: String,
-        snapshot_name: String,
-    },
-    GetSnapshots{
-        vm_name: String,
-    },
+    #[serde(rename = "list_containers")]
+    ListContainers,
 }
 
 impl ToString for CpiCommandType {
     fn to_string(&self) -> String {
         match self {
-            CpiCommandType::CreateVM { .. } => "create_vm".to_string(),
-            CpiCommandType::DeleteVM { .. } => "delete_vm".to_string(),
-            CpiCommandType::HasVM { .. } => "has_vm".to_string(),
-            CpiCommandType::ConfigureNetworks { .. } => "configure_networks".to_string(),
-            CpiCommandType::CreateDisk { .. } => "create_disk".to_string(),
-            CpiCommandType::AttachDisk { .. } => "attach_disk".to_string(),
-            CpiCommandType::DeleteDisk { .. } => "delete_disk".to_string(),
-            CpiCommandType::DetachDisk { .. } => "detach_disk".to_string(),
-            CpiCommandType::HasDisk { .. } => "has_disk".to_string(),
-            CpiCommandType::SetVMMetadata { .. } => "set_vm_metadata".to_string(),
-            CpiCommandType::CreateSnapshot { .. } => "create_snapshot".to_string(),
-            CpiCommandType::DeleteSnapshot { .. } => "delete_snapshot".to_string(),
-            CpiCommandType::HasSnapshot { .. } => "has_snapshot".to_string(),
-            CpiCommandType::GetDisks { .. } => "get_disks".to_string(),
-            CpiCommandType::GetVM { .. } => "get_vm".to_string(),
-            CpiCommandType::RebootVM { .. } => "reboot_vm".to_string(),
-            CpiCommandType::SnapshotDisk { .. } => "snapshot_disk".to_string(),
-            CpiCommandType::GetSnapshots { .. } => "get_snapshots".to_string(),
+            CpiCommandType::CreateContainer { .. } => "create_container".to_string(),
+            CpiCommandType::DeleteContainer { .. } => "delete_container".to_string(),
+            CpiCommandType::StartContainer { .. } => "start_container".to_string(),
+            CpiCommandType::StopContainer { .. } => "stop_container".to_string(),
+            CpiCommandType::RestartContainer { .. } => "restart_container".to_string(),
+            CpiCommandType::InspectContainer { .. } => "inspect_container".to_string(),
+            CpiCommandType::ListContainers => "list_containers".to_string(),
         }
     }
 }
 
 // Return types for the API calls
 #[derive(Debug, Serialize, Deserialize)]
-pub struct Instance {
+pub struct Container {
     pub id: String,
     pub state: String,
-    pub instance_type: String,
+    pub image: String,
+    pub name: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct Volume {
-    pub id: String,
-    pub size: i32,
-    pub state: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Snapshot {
-    pub id: String,
-    pub state: String,
-    pub description: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Tag {
-    pub key: String,
-    pub value: String,
+pub struct ContainerList {
+    pub containers: Vec<Container>,
 }
 
 pub struct CpiApi {
@@ -334,48 +242,37 @@ pub struct CpiApi {
 
 pub fn test() {
     let cpi = CpiCommand::new().unwrap();
-    let vm = cpi.execute(CpiCommandType::CreateVM {
-        guest_id: "ubuntu".to_string(),
-        memory_mb: 4096,
-        cpu_count: 8,
-        os_type: "Linux".to_string(),
-        resource_pool: "default".to_string(),
-        datastore: "datastore1".to_string(),
-        vm_name: "test-vm".to_string(),
+    let container = cpi.execute(CpiCommandType::CreateContainer {
+        image: "nginx:latest".to_string(),
+        name: "test-container".to_string(),
+        ports: vec!["80:80".to_string()],
+        env: HashMap::new(),
     });
-    println!("Created VM: {:?}", vm);
+    println!("Created Container: {:?}", container);
 
-    dprintln!("VM exists: {:?}", vm);
+    dprintln!("Container exists: {:?}", container);
 
-    // Configure networks for the VM
-    let network_config = cpi.execute(CpiCommandType::ConfigureNetworks {
-        vm_name: "test-vm".to_string(),
-        network_index: 0,
-        network_type: "VM Network".to_string(),
+    // Start the container
+    let start_container = cpi.execute(CpiCommandType::StartContainer {
+        name: "test-container".to_string(),
     });
-    println!("Configured Networks: {:?}", network_config);
+    println!("Started Container: {:?}", start_container);
     
-    // Set metadata for the VM
-    let metadata = cpi.execute(CpiCommandType::SetVMMetadata {
-        vm_name: "test-vm".to_string(),
-        key: "environment".to_string(),
-        value: "development".to_string(),
+    // Inspect the container
+    let inspect_container = cpi.execute(CpiCommandType::InspectContainer {
+        name: "test-container".to_string(),
     });
-    println!("Set VM Metadata: {:?}", metadata);
+    println!("Inspected Container: {:?}", inspect_container);
     
-    // Create a disk for the VM
-    let disk = cpi.execute(CpiCommandType::CreateDisk {
-        size_mb: 10240,
-        disk_path: "/vmfs/volumes/datastore1/test-vm/test-disk.vmdk".to_string(),
+    // Stop the container
+    let stop_container = cpi.execute(CpiCommandType::StopContainer {
+        name: "test-container".to_string(),
     });
-    println!("Created Disk: {:?}", disk);
+    println!("Stopped Container: {:?}", stop_container);
     
-    // Attach the disk to the VM
-    let attach_disk = cpi.execute(CpiCommandType::AttachDisk {
-        vm_name: "test-vm".to_string(),
-        controller_name: "SCSI Controller 0".to_string(),
-        port: 0,
-        disk_path: "/vmfs/volumes/datastore1/test-vm/test-disk.vmdk".to_string(),
+    // Delete the container
+    let delete_container = cpi.execute(CpiCommandType::DeleteContainer {
+        name: "test-container".to_string(),
     });
-    println!("Attached Disk: {:?}", attach_disk);
+    println!("Deleted Container: {:?}", delete_container);
 }

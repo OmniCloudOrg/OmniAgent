@@ -1,0 +1,90 @@
+{
+    "name": "container_cpi",
+    "type": "container",
+    "actions": {
+        "create_container": {
+            "command": "docker run -d --name {name} -p {ports} --env-file <(printf '%s\n' {env}) {image}",
+            "params": ["name", "image", "ports", "env"]
+        },
+        "delete_container": {
+            "command": "docker rm -f {name}",
+            "params": ["name"],
+            "pre_delete": [
+                "docker stop {name}"
+            ]
+        },
+        "start_container": {
+            "command": "docker start {name}",
+            "params": ["name"]
+        },
+        "stop_container": {
+            "command": "docker stop {name}",
+            "params": ["name"]
+        },
+        "restart_container": {
+            "command": "docker restart {name}",
+            "params": ["name"]
+        },
+        "inspect_container": {
+            "command": "docker inspect {name}",
+            "params": ["name"]
+        },
+        "list_containers": {
+            "command": "docker ps",
+            "params": []
+        },
+        "create_volume": {
+            "command": "docker volume create {name}",
+            "params": ["name"]
+        },
+        "delete_volume": {
+            "command": "docker volume rm {name}",
+            "params": ["name"]
+        },
+        "attach_volume": {
+            "command": "docker run -v {volume}:{mount_point} {name}",
+            "params": ["name", "volume", "mount_point"]
+        },
+        "create_network": {
+            "command": "docker network create {name}",
+            "params": ["name"]
+        },
+        "delete_network": {
+            "command": "docker network rm {name}",
+            "params": ["name"]
+        },
+        "connect_network": {
+            "command": "docker network connect {network} {container_id}",
+            "params": ["network", "container_id"]
+        },
+        "disconnect_network": {
+            "command": "docker network disconnect {network} {container_id}",
+            "params": ["network", "container_id"]
+        },
+        "logs": {
+            "command": "docker logs {name}",
+            "params": ["name"]
+        },
+        "exec": {
+            "command": "docker exec {name} {cmd}",
+            "params": ["name", "cmd"]
+        }
+    },
+    "default_settings": {
+        "restart_policy": "unless-stopped",
+        "network_mode": "bridge",
+        "logging_driver": "json-file",
+        "logging_options": {
+            "max-size": "100m",
+            "max-file": "3"
+        }
+    },
+    "validation": {
+        "required_commands": [
+            "docker"
+        ],
+        "version_requirements": {
+            "docker": ">=20.10.0"
+        }
+    }
+}

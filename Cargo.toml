@@ -18,3 +18,4 @@ ez_logging = "0.1.4"
 debug_print = "1.0.0"
 anyhow = "1.0.93"
 rocket = { version = "0.5.1", features = ["json"] }
+colored = "2.1.0"
