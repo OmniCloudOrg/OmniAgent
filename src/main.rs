@@ -47,6 +47,7 @@ async fn list_containers() -> impl Responder {
     let output = Command::new("docker")
         .args(["ps", "-a", "--format", "{{.ID}}\t{{.Names}}\t{{.Status}}\t{{.Image}}\t{{.CreatedAt}}\t{{.Ports}}"])
         .output();
+    println!("{:?}", output);
 
     match output {
         Ok(output) => {

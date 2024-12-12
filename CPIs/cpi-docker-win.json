@@ -30,7 +30,7 @@
             "params": ["name"]
         },
         "list_containers": {
-            "command": "docker ps",
+            "command": "powershell docker ps -a --format='\"{\"id\":\"{{.ID}}\", \"name\":\"{{.Names}}\", \"status\":\"{{.Status}}\"}\"' | ConvertTo-Json",
             "params": []
         },
         "create_volume": {

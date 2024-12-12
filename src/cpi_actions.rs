@@ -21,7 +21,7 @@ pub struct CpiCommand {
 
 impl CpiCommand {
     pub fn new() -> Result<Self> {
-        let config_str = fs::read_to_string("./CPIs/cpi-container.json")?;
+        let config_str = fs::read_to_string("./CPIs/cpi-docker-win.json")?;
         let config_json: Value = serde_json::from_str(&config_str)?;
 
         Ok(Self {
@@ -40,6 +40,7 @@ impl CpiCommand {
         let actions = config_json
             .get("actions")
             .context("'actions' was not defined in the config")?;
+
         let command_type = actions.get(command.to_string()).context(format!(
             "Command type not found for '{}'",
             command.to_string()
@@ -51,7 +52,9 @@ impl CpiCommand {
             .context("'command field not found for command type'")?
             .as_str()
             .unwrap();
-    
+        
+//        panic!("Command template: {}", command_template);
+
         // Get the post-exec command templates if they exist
         let post_exec_templates = match command_type.get("post_exec") {
             Some(post_exec) => {
@@ -71,14 +74,20 @@ impl CpiCommand {
     
         // Serialize the enum variant to a JSON Value and extract params
         let params: Value = serde_json::to_value(&command).context("failed to serialize command")?;
+        println!("Command type: {}", command.to_string().green());
         println!("Command parameters:");
         println!("Params {}", &params);
-    
-        let params = params
+
+        // Identify Params and insert the corrent values into the command template
+        let params = if params.as_object().map_or(true, |obj| obj.is_empty()) {
+            &Map::new()
+        } else {
+            params
             .as_object()
             .and_then(|obj| obj.values().next())
             .and_then(|v| v.as_object())
-            .context("failed to extract params from command")?;
+            .context("failed to extract params from command")?
+        };
     
         // Execute main command
         let mut command_str = replace_template_params(params, &mut command_template.to_string());
@@ -114,25 +123,27 @@ impl CpiCommand {
             println!("No post-exec commands found");
         }
 
-        let json_output = serde_json::from_str("NULL")?;
+        let escaped_output_str = serde_json::to_string(&output_str).context("failed to escape output string")?;
+        let json_output = serde_json::from_str(&format!(r#"{{"result": {}}}"#, escaped_output_str))?;
         Ok(json_output)
     }
 }
 
 fn execute_shell_cmd(command_str: &mut String) -> Result<Output> {
-    // Execute the command (Linux)
-    #[cfg(target_os = "linux")]
-    let output = Command::new("sh").arg("-c").arg(&command_str).output()?;
+    // Split into first word and the rest
+    let mut parts = command_str.splitn(2, ' ');
+    let executable = parts.next().unwrap_or("");
+    let args = parts.next().unwrap_or("");
 
-    // Execute the command (MacOSX)
-    #[cfg(target_os = "macos")]
-    let output = Command::new("sh").arg("-c").arg(&command_str).output()?;
+    eprintln!("Executable: {}", executable);
+    eprintln!("Args: {}", args);
+    eprintln!("Parts: {:?}", parts);
 
-    // Execute the command (Windows)
-    #[cfg(target_os = "windows")]
-    let output = Command::new("cmd").arg("/C").arg(&command_str).output()?;
+    let output = Command::new(executable)
+        .args(args.split_whitespace())
+        .output()?;
 
-    return Ok(output);
+    Ok(output)
 }
 
 fn replace_template_params(params: &Map<String, Value>, command_str: &mut String) -> String {
