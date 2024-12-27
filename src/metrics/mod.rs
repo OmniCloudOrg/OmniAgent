@@ -1,6 +1,5 @@
 use std::collections::VecDeque;
 use chrono::{DateTime, Utc};
-use std::rc::*;
 pub mod proposal;
 
 #[derive(Debug, Clone)]

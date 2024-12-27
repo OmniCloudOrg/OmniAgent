@@ -1,6 +1,5 @@
 use anyhow::Context;
 use anyhow::Result;
-use anyhow::anyhow;
 use colored::Colorize;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
@@ -8,12 +7,6 @@ use std::collections::HashMap;
 use std::fs;
 use std::process::{Command, Output};
 use ez_logging::println;
-use debug_print::{
-    debug_print as dprint,
-    debug_println as dprintln,
-    debug_eprint as deprint,
-    debug_eprintln as deprintln,
-};
 
 pub struct CpiCommand {
     pub config: String,
@@ -107,7 +100,7 @@ impl CpiCommand {
     
         // Execute post-exec commands if they exist
         if !post_exec_templates.is_empty() {
-            for (index, post_exec_template) in post_exec_templates.iter().enumerate() {
+            for (_, post_exec_template) in post_exec_templates.iter().enumerate() {
                 let mut post_exec_command = replace_template_params(params, &mut post_exec_template.to_string());
         
                 let post_exec_output = execute_shell_cmd(&mut post_exec_command)?;
@@ -135,9 +128,11 @@ fn execute_shell_cmd(command_str: &mut String) -> Result<Output> {
     let executable = parts.next().unwrap_or("");
     let args = parts.next().unwrap_or("");
 
-    eprintln!("Executable: {}", executable);
-    eprintln!("Args: {}", args);
-    eprintln!("Parts: {:?}", parts);
+    let parts_sting: String = parts.into_iter().collect();
+
+    eprintln!("Executable: {:#}", executable);
+    eprintln!("Args: {:#}", args);
+    eprintln!("Parts: {:#}", parts_sting);
 
     let output = Command::new(executable)
         .args(args.split_whitespace())
@@ -171,6 +166,7 @@ fn replace_template_params(params: &Map<String, Value>, command_str: &mut String
 }
 
 // Helper trait to handle special types
+#[allow(dead_code)]
 pub trait TemplateValue {
     fn to_template_string(&self) -> String;
 }
@@ -247,10 +243,12 @@ pub struct ContainerList {
     pub containers: Vec<Container>,
 }
 
+#[allow(dead_code)]
 pub struct CpiApi {
     cmd: CpiCommand,
 }
 
+#[allow(dead_code)]
 pub fn test() {
     let cpi = CpiCommand::new().unwrap();
     let container = cpi.execute(CpiCommandType::CreateContainer {
@@ -259,31 +257,30 @@ pub fn test() {
         ports: vec!["80:80".to_string()],
         env: HashMap::new(),
     });
-    println!("Created Container: {:?}", container);
+    println!("Created Container: {:#?}", container);
 
-    dprintln!("Container exists: {:?}", container);
 
     // Start the container
     let start_container = cpi.execute(CpiCommandType::StartContainer {
         name: "test-container".to_string(),
     });
-    println!("Started Container: {:?}", start_container);
+    println!("Started Container: {:#?}", start_container);
     
     // Inspect the container
     let inspect_container = cpi.execute(CpiCommandType::InspectContainer {
         name: "test-container".to_string(),
     });
-    println!("Inspected Container: {:?}", inspect_container);
+    println!("Inspected Container: {:#?}", inspect_container);
     
     // Stop the container
     let stop_container = cpi.execute(CpiCommandType::StopContainer {
         name: "test-container".to_string(),
     });
-    println!("Stopped Container: {:?}", stop_container);
+    println!("Stopped Container: {:#?}", stop_container);
     
     // Delete the container
     let delete_container = cpi.execute(CpiCommandType::DeleteContainer {
         name: "test-container".to_string(),
     });
-    println!("Deleted Container: {:?}", delete_container);
+    println!("Deleted Container: {:#?}", delete_container);
 }

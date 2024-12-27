@@ -1,4 +1,4 @@
-use anyhow::{Result, Context};
+use anyhow::Result;
 use ez_logging::println;
 use rocket::{post, get, response::Responder, routes, serde::json::Json};
 use serde::{Deserialize, Serialize};
@@ -82,6 +82,7 @@ impl Container {
 }
 
 // Custom error handling
+#[allow(dead_code)]
 #[derive(Debug, Responder)]
 pub enum ApiError {
     #[response(status = 500)]
@@ -159,31 +160,3 @@ pub async fn list() -> ApiResult<Value> {
     Ok(Json(result))
 }
 
-pub fn rocket() -> rocket::Rocket<rocket::Build> {
-    // Load environment variables
-    let host = env::var("HOST").unwrap_or_else(|_| "0.0.0.0".to_string());
-    let port = env::var("PORT").unwrap_or_else(|_| "8081".to_string());
-    println!("Container Management API running at http://{}:{}", host, &port);
-
-    // Configure Rocket
-    let config = rocket::Config::figment()
-        .merge(("address", host))
-        .merge(("port", port.parse::<u16>().unwrap()));
-
-    rocket::custom(config).mount(
-        "/",
-        routes![
-            deploy,
-            start,
-            stop,
-            restart,
-            delete,
-            inspect,
-            list
-        ],
-    )
-}
-
-pub async fn launch_rocket() -> Result<rocket::Rocket<rocket::Ignite>> {
-    Ok(rocket().launch().await?)
-}
