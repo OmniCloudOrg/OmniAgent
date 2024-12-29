@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 ARG RUST_VERSION=1.82.0
-ARG APP_NAME=OmniAgent
+ARG APP_NAME=omni-agent
 
 FROM rust:${RUST_VERSION}-alpine AS build
 ARG APP_NAME
@@ -22,7 +22,7 @@ RUN apk add --no-cache docker-cli socat
 COPY --from=build /bin/server /bin/
 
 # Expose the ports that the application listens on
-EXPOSE 8080
+EXPOSE 8081
 EXPOSE 2375
 
 # Remove the USER directive to run as root
