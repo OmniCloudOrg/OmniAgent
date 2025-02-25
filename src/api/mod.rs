@@ -1,9 +1,9 @@
 use anyhow::Result;
 use ez_logging::println;
-use rocket::{post, get, response::Responder, routes, serde::json::Json};
+use rocket::{post, get, response::Responder, serde::json::Json};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::{collections::HashMap, env};
+use std::collections::HashMap;
 use crate::cpi_actions::{CpiCommand, CpiCommandType};
 
 #[derive(Deserialize, Debug)]

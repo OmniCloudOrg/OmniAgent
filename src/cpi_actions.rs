@@ -72,7 +72,7 @@ impl CpiCommand {
         println!("Params {}", &params);
 
         // Identify Params and insert the corrent values into the command template
-        let params = if params.as_object().map_or(true, |obj| obj.is_empty()) {
+        let params = if params.as_object().is_none_or(|obj| obj.is_empty()) {
             &Map::new()
         } else {
             params
@@ -100,7 +100,7 @@ impl CpiCommand {
     
         // Execute post-exec commands if they exist
         if !post_exec_templates.is_empty() {
-            for (_, post_exec_template) in post_exec_templates.iter().enumerate() {
+            for post_exec_template in post_exec_templates.iter() {
                 let mut post_exec_command = replace_template_params(params, &mut post_exec_template.to_string());
         
                 let post_exec_output = execute_shell_cmd(&mut post_exec_command)?;
@@ -128,7 +128,7 @@ fn execute_shell_cmd(command_str: &mut String) -> Result<Output> {
     let executable = parts.next().unwrap_or("");
     let args = parts.next().unwrap_or("");
 
-    let parts_sting: String = parts.into_iter().collect();
+    let parts_sting: String = parts.collect();
 
     eprintln!("Executable: {:#}", executable);
     eprintln!("Args: {:#}", args);
