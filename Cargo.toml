@@ -1,20 +1,41 @@
 [package]
-name = "omni-agent"
+name = "omniagent"
 version = "0.1.0"
 edition = "2021"
+authors = ["Your Name <your.email@example.com>"]
+description = "Cross-platform Docker management agent with automatic initialization"
+license = "MIT"
 
 [dependencies]
+tokio = { version = "1.28", features = ["full"] }
+bollard = { version = "0.14", features = ["ssl"] }
+log = "0.4"
+env_logger = "0.10"
+thiserror = "1.0"
+rocket = { version = "0.5.0", features = ["json"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+futures = "0.3"
+anyhow = "1.0"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+dirs = "5.0"
+which = "4.4"
+async-trait = "0.1"
+console = "0.15"
+indicatif = "0.17"
+reqwest = { version = "0.11", features = ["json"] }
 
-chrono = { version = "0.4.38", features = ["serde"] }
-serde = { version = "1.0.215", features = ["derive"] }
-serde_json = "1.0.89"
-socketioxide = "0.15.1"
-tokio = { version = "1.41.1", features = ["full"] }
-tokio-tungstenite = "0.24.0"
-futures-util = "0.3"
-url = "2.5.4"
-ez_logging = "0.1.4"
-debug_print = "1.0.0"
-anyhow = "1.0.93"
-rocket = { version = "0.5.1", features = ["json"] }
-colored = "2.1.0"
+[target.'cfg(windows)'.dependencies]
+winreg = "0.50"
+winapi = { version = "0.3", features = ["winerror", "handleapi", "fileapi", "namedpipeapi", "winbase"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+core-foundation = "0.9"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+nix = { version = "0.26", features = ["process"] }
+
+[[bin]]
+name = "omniagent"
+path = "src/main.rs"
