@@ -1,0 +1,28 @@
+{
+    "api": {
+        "host": "0.0.0.0",
+        "port": 8081,
+        "log_level": "info"
+    },
+    "docker": {
+        "api_url": "http://localhost:2375", 
+        "default_network": "bridge",
+        "timeout_seconds": 30
+    },
+    "system_metrics": {
+        "refresh_interval_ms": 5000,
+        "log_metrics": false
+    },
+    "security": {
+        "allowed_networks": ["localhost", "127.0.0.1"],
+        "enable_tls": false
+    },
+    "logging": {
+        "format": "json",
+        "output": "stdout"
+    },
+    "platform": {
+        "container_runtime": "docker-desktop",
+        "docker_socket": "npipe:////./pipe/docker_engine"
+    }
+}

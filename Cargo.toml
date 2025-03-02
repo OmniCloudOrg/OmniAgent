@@ -1,29 +1,43 @@
 [package]
-name = "OmniAgent"
-version = "0.1.0"
+name = "omni-agent"
+version = "0.2.0"
 edition = "2021"
+description = "Scalable container management and deployment agent"
 authors = ["Tristan J. Poland"]
-description = "Cross-platform Docker management agent with automatic initialization"
 license = "MIT"
 
 [dependencies]
-rocket = { version = "0.5.0", features = ["json"] }
+lazy_static = "1.4.0"
+# Async runtime
+tokio = { version = "1.35.0", features = ["full"] }
+
+# Web framework
+rocket = { version = "0.5.0-rc.3", features = ["json"] }
+rocket_cors = "0.6.0"
+reqwest = { version = "0.11.6", features = ["json"] }
+
+# Docker interaction
+bollard = "0.15.0"
+
+# Serialization
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-console = "0.15"
-reqwest = { version = "0.11", features = ["json"] }
-sysinfo = "0.33.1"
 
-[target.'cfg(windows)'.dependencies]
-winreg = "0.50"
-winapi = { version = "0.3", features = ["winerror", "handleapi", "fileapi", "namedpipeapi", "winbase"] }
+# Logging
+tracing = "0.1"
+tracing-subscriber = "0.3"
+console = "0.14"
 
-[target.'cfg(target_os = "macos")'.dependencies]
-core-foundation = "0.9"
+# System information
+sysinfo = "0.30.0"
+winapi = { version = "0.3.9", features = ["winerror"] }
 
-[target.'cfg(target_os = "linux")'.dependencies]
-nix = { version = "0.26", features = ["process"] }
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
 
-[[bin]]
-name = "omniagent"
-path = "src/main.rs"
+[profile.dev]
+opt-level = 0
+debug = true
