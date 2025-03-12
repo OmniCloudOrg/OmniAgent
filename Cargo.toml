@@ -7,26 +7,12 @@ authors = ["Tristan J. Poland"]
 license = "MIT"
 
 [dependencies]
-lazy_static = "1.4.0"
-# Async runtime
-tokio = { version = "1.35.0", features = ["full"] }
-
-# Web framework
-rocket = { version = "0.5.0-rc.3", features = ["json"] }
-rocket_cors = "0.6.0"
-reqwest = { version = "0.11.6", features = ["json"] }
-
-# Docker interaction
-bollard = "0.15.0"
-
-# Serialization
+thiserror = "1.0"
+rocket = { version = "0.5.0", features = ["json"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-
-# Logging
-tracing = "0.1"
-tracing-subscriber = "0.3"
-console = "0.14"
+uuid = {version = "0.8", features = ["v4"]}
+colored = "1.0"
 
 # System information
 sysinfo = "0.30.0"
