@@ -1,10 +1,12 @@
 use colored::Colorize;
 use rocket::routes;
 
+pub mod routes;
+use routes::{index, container};
+
 mod agent;
 use agent::Agent;
 
-pub mod routes;
 
 
 const BANNER: &str = r#"
@@ -26,12 +28,21 @@ async fn main() {
     println!("| Agent name: {}", agent.name().bright_blue());
     println!("+-----------------------------------------------------------------");
 
+    let routes = routes![
+        index::     index,
+        container:: get_containers,
+        container:: create_container
+    ];
+
+    let routes_clone = routes.clone();
+
     let _server = rocket::build()
-        .mount("/", routes![routes::index::index])
+        .mount("/", routes)
         .configure(rocket::Config {
             address: "0.0.0.0".parse().unwrap(),
             ..rocket::Config::default()
         })
+        .manage(routes_clone)
         .manage(agent)
         .launch()
         .await;
