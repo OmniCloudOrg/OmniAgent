@@ -1,6 +1,6 @@
 [package]
 name = "omni-agent"
-version = "0.q.0"
+version = "0.1.0"
 edition = "2021"
 description = "Scalable container management and deployment agent"
 authors = ["Tristan J. Poland"]
