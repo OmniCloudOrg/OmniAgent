@@ -1,4 +1,4 @@
-use rocket::{get, post};
+use rocket::{delete, get, post, patch};
 
 #[get("/containers")]
 pub fn get_containers() -> String {
@@ -7,5 +7,15 @@ pub fn get_containers() -> String {
 
 #[post("/containers")]
 pub fn create_container() -> String {
+    "Hello, world!".to_string()
+}
+
+#[delete("/containers")]
+pub fn delete_container() -> String {
+    "Hello, world!".to_string()
+}
+
+#[patch("/containers")]
+pub fn update_container() -> String {
     "Hello, world!".to_string()
 }

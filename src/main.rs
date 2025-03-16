@@ -31,7 +31,9 @@ async fn main() {
     let routes = routes![
         index::     index,
         container:: get_containers,
-        container:: create_container
+        container:: create_container,
+        container:: delete_container,
+        container:: update_container
     ];
 
     let routes_clone = routes.clone();

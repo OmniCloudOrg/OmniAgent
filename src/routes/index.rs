@@ -22,6 +22,7 @@ fn generate_routes_html(routes: &[Route]) -> String {
         let method = match route.method {
             Method::Get => "GET",
             Method::Post => "POST",
+            Method::Patch => "PATCH",
             Method::Put => "PUT",
             Method::Delete => "DELETE",
             Method::Options => "OPTIONS",
@@ -74,6 +75,7 @@ pub fn index(routes: &State<Vec<Route>>) -> content::RawHtml<String> {
                 --post-color: #49cc90;
                 --put-color: #fca130;
                 --delete-color: #f93e3e;
+                --patch-color:rgb(142, 1, 81);
             }}
             
             @media (prefers-color-scheme: dark) {{
@@ -155,10 +157,11 @@ pub fn index(routes: &State<Vec<Route>>) -> content::RawHtml<String> {
                 text-align: center;
             }}
             
-            .method-get {{ background-color: var(--get-color); color: white; }}
-            .method-post {{ background-color: var(--post-color); color: white; }}
-            .method-put {{ background-color: var(--put-color); color: white; }}
-            .method-delete {{ background-color: var(--delete-color); color: white; }}
+            .method-get    {{ background-color: var(--get-color);    color: white; width: 50px; }}
+            .method-put    {{ background-color: var(--put-color);    color: white; width: 50px; }}
+            .method-post   {{ background-color: var(--post-color);   color: white; width: 50px; }}
+            .method-patch  {{ background-color: var(--patch-color);  color: white; width: 50px; }}
+            .method-delete {{ background-color: var(--delete-color); color: white; width: 50px; }}
         </style>
     </head>
     <body>
