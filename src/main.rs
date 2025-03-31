@@ -2,7 +2,8 @@ use colored::Colorize;
 use rocket::routes;
 
 pub mod routes;
-use routes::{index, container};
+use routes::{index, instances};
+use routes::instances::AppManager;
 
 mod agent;
 use agent::Agent;
@@ -18,9 +19,8 @@ const BANNER: &str = r#"
   \____/|_|  |_|_| \_|_____|  /_/    \_\_____|______|_| \_|  |_|
                         Version: {}
 "#;
-
 #[rocket::main]
-async fn main() {
+async fn main() -> Result<(), rocket::Error> {
     println!("{}", BANNER.replace("{}", &env!("CARGO_PKG_VERSION")));
     let agent = Agent::new("OmniAgent 1".to_string(), env!("CARGO_PKG_VERSION").to_string());
     println!("+-----------------------------------------------------------------");
@@ -30,22 +30,44 @@ async fn main() {
 
     let routes = routes![
         index::     index,
-        container:: get_containers,
-        container:: create_container,
-        container:: delete_container,
-        container:: update_container
+        instances:: list_instances,
+        instances:: get_instance,
+        instances:: create_instance,
+        instances:: start_instance,
+        instances:: stop_instance,
+        instances:: restart_instance,
+        instances:: update_instance,
+        instances:: delete_instance,
+        instances:: list_images,
+        instances:: stream_events,
+        instances:: health_check
+
     ];
 
     let routes_clone = routes.clone();
+    let app_manager = match AppManager::new() {
+        Ok(manager) => manager,
+        Err(e) => {
+            eprintln!("Failed to initialize AppManager: {}", e);
+            std::process::exit(1);
+        }
+    };
 
-    let _server = rocket::build()
+    let rocket_instance = rocket::build()
         .mount("/", routes)
         .configure(rocket::Config {
             address: "0.0.0.0".parse().unwrap(),
             ..rocket::Config::default()
         })
         .manage(routes_clone)
-        .manage(agent)
-        .launch()
-        .await;
+        .manage(app_manager);
+
+    // Collect routes information before launch
+    index::collect_routes(&rocket_instance);
+    
+    // Launch the server
+    let _server = rocket_instance.launch().await?;
+    
+
+    Ok(())
 }
