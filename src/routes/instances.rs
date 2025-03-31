@@ -8,7 +8,7 @@ use bollard::Docker;
 use bollard::container::{CreateContainerOptions, Config, StartContainerOptions, StopContainerOptions, RemoveContainerOptions, ListContainersOptions};
 use bollard::image::ListImagesOptions;
 use bollard::system::EventsOptions;
-use futures::stream::StreamExt;
+use futures::stream::{StreamExt, TryStreamExt};
 
 // Data structures
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -380,4 +380,376 @@ pub async fn stream_events(app_manager: &State<AppManager>) -> String {
 #[get("/health")]
 pub fn health_check() -> String {
     "App Manager is healthy".to_string()
+}
+
+#[get("/instances/<id>/logs")]
+pub async fn get_instance_logs(id: String, app_manager: &State<AppManager>) -> Result<String, String> {
+    let options = Some(bollard::container::LogsOptions::<String> {
+        stdout: true,
+        stderr: true,
+        follow: false,
+        timestamps: true,
+        tail: "100".to_string(),
+        ..Default::default()
+    });
+
+    match app_manager.docker.logs(&id, options).try_collect::<Vec<_>>().await {
+        Ok(logs) => {
+            let log_content = logs.iter()
+                .map(|chunk| {
+                    match chunk {
+                        bollard::container::LogOutput::StdOut { message: bytes } | 
+                        bollard::container::LogOutput::StdErr { message: bytes } => {
+                            String::from_utf8_lossy(bytes).to_string()
+                        },
+                        bollard::container::LogOutput::StdIn { message: bytes } => {
+                            String::from_utf8_lossy(bytes).to_string()
+                        },
+                        bollard::container::LogOutput::Console { message: bytes } => {
+                            String::from_utf8_lossy(bytes).to_string()
+                        }
+                    }
+                })
+                .collect::<Vec<String>>()
+                .join("");
+            Ok(log_content)
+        },
+        Err(e) => Err(format!("Failed to fetch logs: {}", e))
+    }
+}
+
+#[get("/instances/<id>/stats")]
+pub async fn get_instance_stats(id: String, app_manager: &State<AppManager>) -> Result<Json<bollard::container::Stats>, String> {
+    match app_manager.docker.stats(&id, Some(bollard::container::StatsOptions { 
+        stream: false,
+        one_shot: true,
+    })).try_next().await {
+        Ok(Some(stats)) => Ok(Json(stats)),
+        Ok(None) => Err("No stats available".to_string()),
+        Err(e) => Err(format!("Failed to get stats: {}", e))
+    }
+}
+
+#[put("/instances/<id>/pause")]
+pub async fn pause_instance(id: String, app_manager: &State<AppManager>) -> Result<String, String> {
+    match app_manager.docker.pause_container(&id).await {
+        Ok(_) => Ok(format!("Instance {} paused", id)),
+        Err(e) => Err(format!("Failed to pause instance: {}", e))
+    }
+}
+
+#[put("/instances/<id>/unpause")]
+pub async fn unpause_instance(id: String, app_manager: &State<AppManager>) -> Result<String, String> {
+    match app_manager.docker.unpause_container(&id).await {
+        Ok(_) => Ok(format!("Instance {} unpaused", id)),
+        Err(e) => Err(format!("Failed to unpause instance: {}", e))
+    }
+}
+
+#[get("/instances/<id>/inspect")]
+pub async fn inspect_instance(id: String, app_manager: &State<AppManager>) -> Result<Json<bollard::models::ContainerInspectResponse>, String> {
+    match app_manager.docker.inspect_container(&id, None).await {
+        Ok(info) => Ok(Json(info)),
+        Err(e) => Err(format!("Failed to inspect instance: {}", e))
+    }
+}
+
+// Volume Management
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VolumeInfo {
+    name: String,
+    mountpoint: String,
+    labels: HashMap<String, String>,
+    created_at: String,
+}
+
+#[get("/volumes")]
+pub async fn list_volumes(app_manager: &State<AppManager>) -> Result<Json<Vec<VolumeInfo>>, String> {
+    match app_manager.docker.list_volumes::<String>(None).await {
+        Ok(volumes) => {
+            let volume_list = volumes.volumes.unwrap_or_default().into_iter()
+                .filter_map(|vol| {
+                    let name = vol.name;
+                    let mountpoint = vol.mountpoint;
+                    let labels = vol.labels;
+                    let created_at = vol.created_at.unwrap_or_default();
+                    
+                    Some(VolumeInfo {
+                        name,
+                        mountpoint,
+                        labels,
+                        created_at,
+                    })
+                })
+                .collect();
+            
+            Ok(Json(volume_list))
+        },
+        Err(e) => Err(format!("Failed to list volumes: {}", e))
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VolumeCreateRequest {
+    name: String,
+    labels: Option<HashMap<String, String>>,
+}
+
+#[post("/volumes", format = "json", data = "<volume_req>")]
+pub async fn create_volume(volume_req: Json<VolumeCreateRequest>, app_manager: &State<AppManager>) -> Result<Json<VolumeInfo>, String> {
+    let options = bollard::volume::CreateVolumeOptions {
+        name: volume_req.name.clone(),
+        labels: volume_req.labels.clone().unwrap_or_default(),
+        ..Default::default()
+    };
+    
+    match app_manager.docker.create_volume(options).await {
+        Ok(volume) => {
+            let volume_info = VolumeInfo {
+                name: volume.name,
+                mountpoint: volume.mountpoint,
+                labels: volume.labels,
+                created_at: volume.created_at.unwrap_or_default(),
+            };
+            
+            Ok(Json(volume_info))
+        },
+        Err(e) => Err(format!("Failed to create volume: {}", e))
+    }
+}
+
+#[delete("/volumes/<name>")]
+pub async fn delete_volume(name: String, app_manager: &State<AppManager>) -> Result<String, String> {
+    match app_manager.docker.remove_volume(&name, None).await {
+        Ok(_) => Ok(format!("Volume {} deleted successfully", name)),
+        Err(e) => Err(format!("Failed to delete volume: {}", e))
+    }
+}
+
+// Network Management
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NetworkInfo {
+    id: String,
+    name: String,
+    driver: String,
+    scope: String,
+    containers: HashMap<String, NetworkContainerInfo>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NetworkContainerInfo {
+    name: String,
+    endpoint_id: String,
+    ipv4_address: String,
+}
+
+#[get("/networks")]
+pub async fn list_networks(app_manager: &State<AppManager>) -> Result<Json<Vec<NetworkInfo>>, String> {
+    match app_manager.docker.list_networks::<String>(None).await {
+        Ok(networks) => {
+            let network_list = networks.into_iter()
+                .filter_map(|net| {
+                    let id = net.id?;
+                    let name = net.name?;
+                    let driver = net.driver?;
+                    let scope = net.scope?;
+                    
+                    let mut containers = HashMap::new();
+                    if let Some(net_containers) = net.containers {
+                        for (container_id, container_info) in net_containers {
+                            if let (Some(name), Some(endpoint_id), Some(ipv4_address)) = 
+                               (container_info.name, container_info.endpoint_id, container_info.ipv4_address) {
+                                containers.insert(container_id, NetworkContainerInfo {
+                                    name,
+                                    endpoint_id,
+                                    ipv4_address,
+                                });
+                            }
+                        }
+                    }
+                    
+                    Some(NetworkInfo {
+                        id,
+                        name,
+                        driver,
+                        scope,
+                        containers,
+                    })
+                })
+                .collect();
+            
+            Ok(Json(network_list))
+        },
+        Err(e) => Err(format!("Failed to list networks: {}", e))
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NetworkCreateRequest {
+    name: String,
+    driver: Option<String>,
+    labels: Option<HashMap<String, String>>,
+}
+
+#[post("/networks", format = "json", data = "<network_req>")]
+pub async fn create_network(network_req: Json<NetworkCreateRequest>, app_manager: &State<AppManager>) -> Result<Json<NetworkInfo>, String> {
+    let options = bollard::network::CreateNetworkOptions {
+        name: network_req.name.clone(),
+        driver: network_req.driver.clone().unwrap_or_default(),
+        labels: network_req.labels.clone().unwrap_or_default(),
+        ..Default::default()
+    };
+    
+    match app_manager.docker.create_network(options).await {
+        Ok(response) => {
+            // Inspect network to get full details
+            match app_manager.docker.inspect_network::<String>(response.id.as_str(), None).await {
+                Ok(network) => {
+                    let mut containers = HashMap::new();
+                    if let Some(net_containers) = network.containers {
+                        for (container_id, container_info) in net_containers {
+                            if let (Some(name), Some(endpoint_id), Some(ipv4_address)) = 
+                               (container_info.name, container_info.endpoint_id, container_info.ipv4_address) {
+                                containers.insert(container_id, NetworkContainerInfo {
+                                    name,
+                                    endpoint_id,
+                                    ipv4_address,
+                                });
+                            }
+                        }
+                    }
+                    
+                    let network_info = NetworkInfo {
+                        id: network.id.unwrap_or_default(),
+                        name: network.name.unwrap_or_default(),
+                        driver: network.driver.unwrap_or_default(),
+                        scope: network.scope.unwrap_or_default(),
+                        containers,
+                    };
+                    
+                    Ok(Json(network_info))
+                },
+                Err(e) => Err(format!("Failed to inspect created network: {}", e))
+            }
+        },
+        Err(e) => Err(format!("Failed to create network: {}", e))
+    }
+}
+
+#[delete("/networks/<id>")]
+pub async fn delete_network(id: String, app_manager: &State<AppManager>) -> Result<String, String> {
+    match app_manager.docker.remove_network(&id).await {
+        Ok(_) => Ok(format!("Network {} deleted successfully", id)),
+        Err(e) => Err(format!("Failed to delete network: {}", e))
+    }
+}
+
+#[put("/instances/<id>/connect/<network_id>")]
+pub async fn connect_instance_to_network(id: String, network_id: String, app_manager: &State<AppManager>) -> Result<String, String> {
+    let options = bollard::network::ConnectNetworkOptions {
+        container: id.clone(),
+        ..Default::default()
+    };
+    
+    match app_manager.docker.connect_network(&network_id, options).await {
+        Ok(_) => Ok(format!("Instance {} connected to network {}", id, network_id)),
+        Err(e) => Err(format!("Failed to connect instance to network: {}", e))
+    }
+}
+
+#[put("/instances/<id>/disconnect/<network_id>")]
+pub async fn disconnect_instance_from_network(id: String, network_id: String, app_manager: &State<AppManager>) -> Result<String, String> {
+    let options = bollard::network::DisconnectNetworkOptions {
+        container: id.clone(),
+        force: false,
+    };
+    
+    match app_manager.docker.disconnect_network(&network_id, options).await {
+        Ok(_) => Ok(format!("Instance {} disconnected from network {}", id, network_id)),
+        Err(e) => Err(format!("Failed to disconnect instance from network: {}", e))
+    }
+}
+
+// Agent Management Routes
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentInfo {
+    id: String,
+    name: String,
+    version: String,
+    platform: String,
+    instance_count: usize,
+    status: String,
+    resources: SystemResources,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SystemResources {
+    cpu_count: usize,
+    memory_total: u64,
+    memory_available: u64,
+    disk_total: u64,
+    disk_available: u64,
+}
+
+#[get("/agent/info")]
+pub async fn get_agent_info(app_manager: &State<AppManager>) -> Json<AgentInfo> {
+    // Get Docker engine info
+    let info = match app_manager.docker.info().await {
+        Ok(info) => info,
+        Err(e) => {
+            eprintln!("Failed to get Docker info: {}", e);
+            return Json(AgentInfo {
+                id: uuid::Uuid::new_v4().to_string(),
+                name: hostname::get().unwrap_or_default().to_string_lossy().to_string(),
+                version: "unknown".to_string(),
+                platform: "unknown".to_string(),
+                instance_count: app_manager.instances.lock().unwrap().len(),
+                status: "degraded".to_string(),
+                resources: SystemResources {
+                    cpu_count: num_cpus::get(),
+                    memory_total: 0,
+                    memory_available: 0,
+                    disk_total: 0,
+                    disk_available: 0,
+                },
+            });
+        }
+    };
+    
+    // Get system resources
+    let memory_info = sys_info::mem_info().unwrap_or(sys_info::MemInfo {
+        total: 0,
+        free: 0,
+        avail: 0,
+        buffers: 0,
+        cached: 0,
+        swap_total: 0,
+        swap_free: 0,
+    });
+    
+    let disk_info = sys_info::disk_info().unwrap_or(sys_info::DiskInfo {
+        total: 0,
+        free: 0,
+    });
+    
+    Json(AgentInfo {
+        id: uuid::Uuid::new_v4().to_string(),
+        name: hostname::get().unwrap_or_default().to_string_lossy().to_string(),
+        version: info.server_version.unwrap_or_default(),
+        platform: format!("{} / {}", 
+            info.operating_system.unwrap_or_default(),
+            info.architecture.unwrap_or_default()),
+        instance_count: app_manager.instances.lock().unwrap().len(),
+        status: "healthy".to_string(),
+        resources: SystemResources {
+            cpu_count: num_cpus::get(),
+            memory_total: memory_info.total * 1024,
+            memory_available: memory_info.avail * 1024,
+            disk_total: disk_info.total * 1024,
+            disk_available: disk_info.free * 1024,
+        },
+    })
 }

@@ -40,7 +40,21 @@ async fn main() -> Result<(), rocket::Error> {
         instances:: delete_instance,
         instances:: list_images,
         instances:: stream_events,
-        instances:: health_check
+        instances:: health_check,
+        instances:: get_instance_logs,
+        instances:: get_instance_stats,
+        instances:: pause_instance,
+        instances:: unpause_instance,
+        instances:: inspect_instance,
+        instances:: list_volumes,
+        instances:: create_volume,
+        instances:: delete_volume,
+        instances:: list_networks,
+        instances:: create_network,
+        instances:: delete_network,
+        instances:: connect_instance_to_network,
+        instances:: disconnect_instance_from_network,
+        instances:: get_agent_info
 
     ];
 

@@ -324,7 +324,7 @@ pub fn index() -> content::RawHtml<String> {
 <body>
     <div class="container">
         <h1>Welcome to OmniAgent</h1>
-        <p>OmniAgent is a distributed system for managing application instances within the OmniCloud platform. Please refer to the API documentation below to get started!</p>
+        <p>OmniAgent is a distributed system for managing application instances within a given worker on the OmniCloud platform. Please refer to the API documentation below to get started!</p>
     </div>
 
     <div class="routes-section">
