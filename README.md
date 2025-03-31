@@ -1,154 +1,201 @@
-# 🚀 OmniCloud Agent
+# OmniAgent
 
-## Unified Container Management & System Orchestration
+![OmniAgent Logo](https://placeholder.pics/svg/300x100/DEDEDE/555555/OmniAgent)
 
-![Build Status](https://img.shields.io/badge/build-passing-brightgreen)
-![Version](https://img.shields.io/badge/version-1.0.0-blue)
-![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20Windows%20%7C%20macOS-lightgrey)
+[![Docker](https://github.com/OmniCloudOrg/OmniAgent/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/OmniCloudOrg/OmniAgent/actions/workflows/docker-publish.yml)
+[![Rust](https://github.com/OmniCloudOrg/OmniAgent/actions/workflows/rust.yml/badge.svg)](https://github.com/OmniCloudOrg/OmniAgent/actions/workflows/rust.yml)
+[![Release](https://github.com/OmniCloudOrg/OmniAgent/actions/workflows/release.yml/badge.svg)](https://github.com/OmniCloudOrg/OmniAgent/actions/workflows/release.yml)
 
-## 🌟 What is OmniCloud Agent?
+OmniAgent is a robust, cross-platform container management and deployment agent built in Rust. It provides a RESTful API interface to Docker operations, making it easier to manage containerized applications across distributed environments.
 
-OmniCloud Agent is a cross-platform microservice that provides granular container management, system metrics collection, and infrastructure orchestration. Designed for scalability and flexibility, it serves as the critical link between your OmniCloud control plane and individual compute resources.
+## ✨ Features
 
-### 💡 Key Features
+- 🐳 **Complete Docker Management**: Control containers, images, volumes, and networks through a simple API
+- 📊 **Real-time Metrics**: Prometheus-compatible metrics for monitoring system and container performance
+- 🔄 **Auto-Discovery**: Self-initializes Docker if not already running (platform aware)
+- 🔒 **Secure API**: Built-in token-based authentication system
+- 🌐 **Cross-Platform**: Runs on Linux, macOS, and Windows
+- 🚀 **Efficient**: Small memory footprint and fast performance with Rust
+- 📡 **Heartbeat System**: Built-in communication with centralized director services
+- 🔌 **Extensible**: Modular design makes it easy to add new features
 
-- **Cross-Platform Support** 
-  - Native Windows, Linux, and macOS integration
-  - Seamless Docker Desktop and Docker Engine compatibility
+## 🚀 Quick Start
 
-- **Container Lifecycle Management**
-  - Deploy containers with advanced configuration
-  - Start, stop, and remove containers
-  - Network and container status tracking
+### Using Docker (Recommended)
 
-- **Real-Time System Metrics**
-  - Comprehensive resource utilization tracking
-  - CPU, memory, and disk usage monitoring
-  - Configurable metrics collection
-
-- **Secure & Configurable**
-  - Network origin restrictions
-  - Configurable logging
-  - TLS support (planned)
-
-## 🛠 Installation
-
-### Prerequisites
-
-- Rust 1.70+
-- Docker 20.10+ or Docker Desktop
-- Platform-specific Docker configuration
-
-### Quick Start
-
-#### Clone the Repository
 ```bash
-git clone https://github.com/omnicloud/omni-agent.git
-cd omni-agent
+docker run -d --name omniagent \
+  -p 8081:8081 \
+  -p 2375:2375 \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  ghcr.io/yourusername/omniagent:latest
 ```
 
-#### Build & Run
+### From Binary
+
+1. Download the latest binary for your platform from the [Releases](https://github.com/OmniCloudOrg/OmniAgent/releases) page.
+2. Make it executable (Linux/macOS): `chmod +x omni-agent`
+3. Run it: `./omni-agent`
+
+### Building from Source
+
+Prerequisites: Rust and Cargo installed
+
 ```bash
+# Clone the repository
+git clone https://github.com/yourusername/OmniAgent.git
+cd OmniAgent
+
 # Build the project
 cargo build --release
 
 # Run the agent
-cargo run --release
-```
-
-### Configuration
-
-Create a `config.json` in the project root:
-
-```json
-{
-    "api": {
-        "host": "0.0.0.0",
-        "port": 8081,
-        "log_level": "info"
-    },
-    "docker": {
-        "api_url": "http://localhost:2375",
-        "default_network": "bridge",
-        "timeout_seconds": 30
-    },
-    "platform": {
-        "container_runtime": "docker-desktop",
-        "docker_socket": "npipe:////./pipe/docker_engine"
-    }
-}
+./target/release/omni-agent
 ```
 
 ## 🔌 API Endpoints
 
+OmniAgent exposes a RESTful API on port 8081. Here are the core endpoints:
+
 ### Container Management
-- `POST /deploy`: Deploy a new container
-- `POST /start/{container_id}`: Start a container
-- `POST /stop/{container_id}`: Stop a container
-- `DELETE /remove/{container_id}`: Remove a container
-- `GET /status/{container_id}`: Get container status
+- `GET /api/containers` - List all containers
+- `GET /api/containers/{id}` - Get container details
+- `POST /api/containers` - Create a new container
+- `POST /api/containers/{id}/start` - Start a container
+- `POST /api/containers/{id}/stop` - Stop a container
+- `POST /api/containers/{id}/restart` - Restart a container
+- `DELETE /api/containers/{id}` - Remove a container
+- `GET /api/containers/{id}/logs` - Get container logs
+- `POST /api/containers/{id}/exec` - Execute a command in a container
 
-### System Metrics
-- `GET /metrics/system`: Retrieve system resource metrics
+### Image Management
+- `GET /api/images` - List all images
+- `POST /api/images/pull` - Pull an image
+- `DELETE /api/images/{id}` - Remove an image
+- `POST /api/images/build` - Build an image
+- `GET /api/images/{id}` - Get image details
 
-## 📡 Configuration Options
+### Volume Management
+- `GET /api/volumes` - List all volumes
+- `POST /api/volumes` - Create a volume
+- `GET /api/volumes/{name}` - Get volume details
+- `DELETE /api/volumes/{name}` - Remove a volume
+- `POST /api/volumes/prune` - Prune unused volumes
 
-### Environment Variables
-- `OMNI_AGENT_CONFIG`: Custom configuration file path
+### Network Management
+- `GET /api/networks` - List all networks
+- `POST /api/networks` - Create a network
+- `GET /api/networks/{id}` - Get network details
+- `DELETE /api/networks/{id}` - Remove a network
+- `POST /api/networks/{id}/connect` - Connect a container to a network
+- `POST /api/networks/{id}/disconnect` - Disconnect a container from a network
+- `POST /api/networks/prune` - Prune unused networks
 
-### Platform-Specific Settings
-- Windows: Automatically detects Docker Desktop
-- Linux: Standard Docker socket configuration
-- macOS: Supports both Docker Desktop and Docker Engine
+### System Management
+- `GET /api/system/health` - Get system health
+- `GET /api/system/metrics` - Get system metrics
+- `GET /api/system/events` - Get system events
+- `POST /api/system/prune` - Prune unused Docker resources
 
-## 🔒 Security Considerations
+### Agent Management
+- `GET /api/agent/status` - Get agent status
+- `POST /api/agent/register` - Register agent with a director
+- `POST /api/agent/update` - Update agent configuration
 
-- Network origin restrictions
-- Configurable TLS support
-- Minimal container runtime permissions
+## 📊 Metrics
 
-## 🤝 Contributing
+Metrics are exposed in Prometheus format at `/metrics` and in JSON format at `/metrics/json`.
 
-1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
+## 🏗️ Architecture
 
-## 📊 Performance Metrics
+OmniAgent follows a modular architecture:
 
-- Low overhead container management
-- Minimal resource consumption
-- Sub-millisecond API response times
+- **Docker Manager**: Core component for interacting with Docker
+- **API Layer**: Provides RESTful endpoints
+- **Authentication**: Token-based authentication system
+- **Metrics Collector**: Gathers system and container metrics
+- **Models**: Data structures for API communication
 
-## 🛡️ Compatibility
+## 🖥️ Cross-Platform Support
 
-![Docker](https://img.shields.io/badge/Docker-20.10+-blue)
-![Rust](https://img.shields.io/badge/Rust-1.70+-orange)
-![Windows](https://img.shields.io/badge/Windows-10%2B-blue)
-![Linux](https://img.shields.io/badge/Linux-Any%20Distro-green)
-![macOS](https://img.shields.io/badge/macOS-10.15+-lightgrey)
+OmniAgent supports:
 
-## 📦 Deployment Scenarios
+- Linux (x86_64, ARM64, ARMv7)
+- macOS (x86_64, ARM64)
+- Windows (x86_64, i686, ARM64)
 
-- Cloud Infrastructure
-- Edge Computing
-- Hybrid Environments
-- Microservice Architectures
-- Development & Testing Workflows
+Each platform has platform-specific optimizations for Docker communication.
 
-## 📞 Support
+## 🔄 Using with Orchestration Systems
 
-- GitHub Issues
-- Community Discord
-- Email Support: support@omnicloud.io
+OmniAgent is designed to be packed into the VM images OmniDirectory deploys. This allows the platform to manage apps easily within a given worker.
+
+## 📚 Advanced Usage
+
+### Using with a Director Service
+
+OmniAgent can be registered with a central director service for fleet management:
+
+```bash
+curl -X POST http://localhost:8081/api/agent/register \
+  -H "Content-Type: application/json" \
+  -d '{"director_url": "http://director.example.com", "token": "your-token"}'
+```
+
+### Custom Container Configurations
+
+Create complex container configurations:
+
+```bash
+curl -X POST http://localhost:8081/api/containers \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "my-app",
+    "image": "nginx:latest",
+    "ports": [{"host": 8080, "container": 80, "protocol": "tcp"}],
+    "environment": {"DEBUG": "true", "NODE_ENV": "production"},
+    "volumes": [{"host": "/data", "container": "/app/data", "read_only": false}],
+    "restart_policy": "always"
+  }'
+```
+
+## 🛠️ Development
+
+### Running Tests
+
+```bash
+cargo test
+```
+
+### Building for Different Platforms
+
+```bash
+cargo build --target x86_64-unknown-linux-gnu
+cargo build --target aarch64-apple-darwin
+cargo build --target x86_64-pc-windows-msvc
+```
 
 ## 📄 License
 
-Apache 2.0 License
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 👥 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## 📞 Contact
+
+- Project Link: [https://github.com/OmniCloudOrg/OmniAgent](https://github.com/OmniCloudOrg/OmniAgent)
+- Issue Tracker: [https://github.com/OmniCloudOrg/OmniAgent/issues](https://github.com/OmniCloudOrg/OmniAgent/issues)
 
 ---
 
-**Crafted with ❤️ by the OmniCloud Engineering Team**
-
-*Empowering Distributed Systems, One Container at a Time*
+<p align="center">
+  Made with ❤️ by <a href="https://github.com/tristanpoland">Tristan J. Poland</a> and the OmniCloud Community
+</p>
