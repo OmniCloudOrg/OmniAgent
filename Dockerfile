@@ -8,7 +8,7 @@ ARG APP_NAME=omni-agent
 
 ################################################################################
 # Create a stage for building the application.
-FROM rust:${RUST_VERSION}-slim AS build
+FROM rustlang/rust:nightly as build
 ARG APP_NAME
 WORKDIR /app
 
